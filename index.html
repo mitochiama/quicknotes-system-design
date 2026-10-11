@@ -24,11 +24,17 @@
       <section class="panel" aria-labelledby="create-heading">
         <h2 id="create-heading">Create a note</h2>
         <p id="form-help" class="muted">
-          Creating notes will be enabled in our next build stage.
+          Add a title and an optional body. Practice notes disappear when you
+          reload the list or refresh the page.
         </p>
 
-        <form id="note-form" aria-describedby="form-help">
-          <fieldset disabled>
+        <form
+          id="note-form"
+          aria-describedby="form-help"
+          novalidate
+          aria-busy="false"
+        >
+          <fieldset>
             <legend class="visually-hidden">Note details</legend>
 
             <label for="title-input">Title (required)</label>
@@ -38,9 +44,10 @@
               type="text"
               required
               maxlength="100"
-              aria-describedby="title-help"
+              aria-describedby="title-help title-error"
             />
             <p id="title-help" class="field-help">Maximum 100 characters.</p>
+            <p id="title-error" class="field-help" hidden></p>
 
             <label for="body-input">Body (optional)</label>
             <textarea id="body-input" name="body" rows="6"></textarea>
@@ -72,7 +79,8 @@
 
     <footer class="site-footer">
       <p>
-        Practice API: JSONPlaceholder. These are sample notes, not private data.
+        Practice API: JSONPlaceholder. Changes are simulated and are not
+        permanently saved.
       </p>
     </footer>
   </body>

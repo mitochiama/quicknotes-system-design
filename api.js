@@ -3,8 +3,13 @@
 const API_URL = "https://jsonplaceholder.typicode.com/posts";
 
 // State and page elements.
-const state = { notes: [], isLoading: false };
+const state = { notes: [], pendingAction: null, nextKey: 1 };
 const loadButton = document.getElementById("load-btn");
+const submitButton = document.getElementById("submit-btn");
+const noteForm = document.getElementById("note-form");
+const titleInput = document.getElementById("title-input");
+const bodyInput = document.getElementById("body-input");
+const titleError = document.getElementById("title-error");
 const statusElement = document.getElementById("status");
 const notesList = document.getElementById("notes-list");
 
@@ -66,10 +71,55 @@ function isValidNote(note) {
   );
 }
 
+function validateTitle(value) {
+  if (value.trim() === "") {
+    return "Enter a title containing at least one non-space character.";
+  }
+  if (value.length > 100) {
+    return "The title must be 100 characters or fewer.";
+  }
+  return "";
+}
+
+function setTitleError(message) {
+  titleInput.setCustomValidity(message);
+  titleError.textContent = message ? `Error: ${message}` : "";
+  titleError.hidden = message === "";
+  if (message) {
+    titleInput.setAttribute("aria-invalid", "true");
+  } else {
+    titleInput.removeAttribute("aria-invalid");
+  }
+}
+
+function toDisplayNote(note) {
+  // JSONPlaceholder may return id 101 for every POST. A separate clientKey
+  // identifies each displayed instance; the API id remains unchanged.
+  // Stage 3 will use this key to remove only the selected displayed note.
+  return { ...note, clientKey: state.nextKey++ };
+}
+
 // Rendering: API text is always inserted as text, never interpreted as HTML.
 function setStatus(message, type = "idle") {
   statusElement.textContent = message;
   statusElement.dataset.state = type;
+}
+
+function setBusy(action) {
+  // Serialize GET and POST so a reload cannot overwrite an in-flight create.
+  state.pendingAction = action;
+  const busy = action !== null;
+  loadButton.disabled = busy;
+  submitButton.disabled = busy;
+  loadButton.textContent = action === "load" ? "Loading..." : "Load notes";
+  submitButton.textContent =
+    action === "create" ? "Creating..." : "Create note";
+
+  // Freeze the submitted draft until the result arrives. Errors preserve it.
+  titleInput.disabled = action === "create";
+  bodyInput.disabled = action === "create";
+  noteForm.setAttribute("aria-busy", String(action === "create"));
+  notesList.setAttribute("aria-busy", String(busy));
 }
 
 function renderNotes(
@@ -102,12 +152,9 @@ function renderNotes(
 
 // Event handling: the state guard also prevents duplicate programmatic calls.
 async function loadNotes() {
-  if (state.isLoading) return;
+  if (state.pendingAction !== null) return;
 
-  state.isLoading = true;
-  loadButton.disabled = true;
-  loadButton.textContent = "Loading...";
-  notesList.setAttribute("aria-busy", "true");
+  setBusy("load");
   setStatus("Loading notes...", "loading");
 
   try {
@@ -117,7 +164,9 @@ async function loadNotes() {
       throw new Error("The server returned unexpected note data.");
     }
 
-    state.notes = data;
+    // A successful reload replaces local practice notes with server samples.
+    // A page refresh also loses them: no local storage or backend persists them.
+    state.notes = data.map(toDisplayNote);
     renderNotes();
     const noun = data.length === 1 ? "note" : "notes";
     setStatus(`Loaded ${data.length} ${noun} from the server.`, "success");
@@ -125,12 +174,64 @@ async function loadNotes() {
     // Keep the previous notes when a reload fails.
     setStatus(`Error: Could not load notes. ${error.message}`, "error");
   } finally {
-    state.isLoading = false;
-    loadButton.disabled = false;
-    loadButton.textContent = "Load notes";
-    notesList.setAttribute("aria-busy", "false");
+    setBusy(null);
+  }
+}
+
+async function createNote(event) {
+  event.preventDefault();
+  if (state.pendingAction !== null) return;
+
+  const validationError = validateTitle(titleInput.value);
+  setTitleError(validationError);
+  if (validationError) {
+    setStatus(`Error: ${validationError}`, "error");
+    titleInput.reportValidity();
+    return;
+  }
+
+  // novalidate lets this handler announce custom errors before invoking
+  // the browser's HTML constraint validation explicitly.
+  if (!noteForm.reportValidity()) {
+    setStatus("Error: Please correct the form before submitting.", "error");
+    return;
+  }
+
+  const payload = {
+    title: titleInput.value.trim(),
+    body: bodyInput.value,
+    userId: 1,
+  };
+
+  setBusy("create");
+  setStatus("Creating note...", "loading");
+
+  try {
+    const { data, status } = await request(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!isValidNote(data)) {
+      throw new Error("The server returned unexpected note data.");
+    }
+
+    state.notes.unshift(toDisplayNote(data));
+    renderNotes();
+    noteForm.reset();
+    setTitleError("");
+    setStatus(`Note created (status ${status}, id ${data.id}).`, "success");
+  } catch (error) {
+    // Do not clear the draft or add a note when creation fails.
+    setStatus(`Error: Could not create note. ${error.message}`, "error");
+  } finally {
+    setBusy(null);
+    titleInput.focus();
   }
 }
 
 loadButton.addEventListener("click", loadNotes);
+noteForm.addEventListener("submit", createNote);
+titleInput.addEventListener("input", () => setTitleError(""));
 renderNotes("No notes loaded yet. Select Load notes to begin.");
