@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="QuickNotes: a browser API client for a software design project."
+    />
+    <title>QuickNotes</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="api.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+
+    <header class="site-header">
+      <p class="eyebrow">Software design project</p>
+      <h1>QuickNotes</h1>
+      <p>A simple space for your notes.</p>
+    </header>
+
+    <main id="main-content" class="app-layout">
+      <section class="panel" aria-labelledby="create-heading">
+        <h2 id="create-heading">Create a note</h2>
+        <p id="form-help" class="muted">
+          Creating notes will be enabled in our next build stage.
+        </p>
+
+        <form id="note-form" aria-describedby="form-help">
+          <fieldset disabled>
+            <legend class="visually-hidden">Note details</legend>
+
+            <label for="title-input">Title (required)</label>
+            <input
+              id="title-input"
+              name="title"
+              type="text"
+              required
+              maxlength="100"
+              aria-describedby="title-help"
+            />
+            <p id="title-help" class="field-help">Maximum 100 characters.</p>
+
+            <label for="body-input">Body (optional)</label>
+            <textarea id="body-input" name="body" rows="6"></textarea>
+
+            <button id="submit-btn" type="submit">Create note</button>
+          </fieldset>
+        </form>
+      </section>
+
+      <section class="panel" aria-labelledby="notes-heading">
+        <div class="section-toolbar">
+          <h2 id="notes-heading">Notes</h2>
+          <button id="load-btn" type="button">Load notes</button>
+        </div>
+
+        <p
+          id="status"
+          class="status"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          data-state="idle"
+        >
+          Ready. Load notes to begin.
+        </p>
+        <ul id="notes-list" aria-busy="false"></ul>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>
+        Practice API: JSONPlaceholder. These are sample notes, not private data.
+      </p>
+    </footer>
+  </body>
+</html>
