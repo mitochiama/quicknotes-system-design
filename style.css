@@ -188,6 +188,22 @@ button:disabled {
 .note-card p {
   margin-bottom: 0;
 }
+
+.delete-btn {
+  margin-top: 1rem;
+  color: #861b1b;
+  background: #fff;
+  border-color: #c48686;
+}
+.delete-btn:hover:not(:disabled) {
+  background: #fff1f1;
+}
+.delete-btn:disabled {
+  color: #475d6b;
+  background: #edf1f3;
+  border-color: #cbd5dc;
+}
+
 .empty-state {
   color: #475d6b;
   background: #f8fafb;
@@ -210,6 +226,7 @@ button:disabled {
 .skip-link:focus {
   transform: translateY(0);
 }
+
 .visually-hidden {
   position: absolute;
   width: 1px;

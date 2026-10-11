@@ -13,7 +13,7 @@ const titleError = document.getElementById("title-error");
 const statusElement = document.getElementById("status");
 const notesList = document.getElementById("notes-list");
 
-// HTTP: return the body and actual status for later POST/DELETE operations.
+// HTTP: return the body and actual status for POST/DELETE operations.
 async function request(url, options = {}) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 15000);
@@ -95,7 +95,7 @@ function setTitleError(message) {
 function toDisplayNote(note) {
   // JSONPlaceholder may return id 101 for every POST. A separate clientKey
   // identifies each displayed instance; the API id remains unchanged.
-  // Stage 3 will use this key to remove only the selected displayed note.
+  // DELETE uses this key to remove only the selected displayed note.
   return { ...note, clientKey: state.nextKey++ };
 }
 
@@ -105,8 +105,8 @@ function setStatus(message, type = "idle") {
   statusElement.dataset.state = type;
 }
 
-function setBusy(action) {
-  // Serialize GET and POST so a reload cannot overwrite an in-flight create.
+function setBusy(action, clientKey = null) {
+  // Serialize list operations so overlapping requests cannot overwrite notes.
   state.pendingAction = action;
   const busy = action !== null;
   loadButton.disabled = busy;
@@ -120,6 +120,13 @@ function setBusy(action) {
   bodyInput.disabled = action === "create";
   noteForm.setAttribute("aria-busy", String(action === "create"));
   notesList.setAttribute("aria-busy", String(busy));
+
+  for (const button of notesList.querySelectorAll(".delete-btn")) {
+    button.disabled = busy;
+    const isSelected = Number(button.dataset.clientKey) === clientKey;
+    button.textContent =
+      action === "delete" && isSelected ? "Deleting..." : "Delete";
+  }
 }
 
 function renderNotes(
@@ -140,12 +147,26 @@ function renderNotes(
     item.className = "note-card";
 
     const title = document.createElement("h3");
+    title.id = `note-title-${note.clientKey}`;
     title.textContent = note.title;
 
     const body = document.createElement("p");
     body.textContent = note.body;
 
-    item.append(title, body);
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.id = `delete-note-${note.clientKey}`;
+    deleteButton.className = "delete-btn";
+    deleteButton.dataset.clientKey = String(note.clientKey);
+    deleteButton.textContent = "Delete";
+    deleteButton.disabled = state.pendingAction !== null;
+    deleteButton.setAttribute(
+      "aria-labelledby",
+      `${deleteButton.id} ${title.id}`,
+    );
+    deleteButton.addEventListener("click", () => deleteNote(note.clientKey));
+
+    item.append(title, body, deleteButton);
     notesList.append(item);
   }
 }
@@ -228,6 +249,48 @@ async function createNote(event) {
   } finally {
     setBusy(null);
     titleInput.focus();
+  }
+}
+
+async function deleteNote(clientKey) {
+  if (state.pendingAction !== null) return;
+
+  const index = state.notes.findIndex((note) => note.clientKey === clientKey);
+  if (index === -1) return;
+
+  const note = state.notes[index];
+  const nextFocusKey =
+    state.notes[index + 1]?.clientKey ??
+    state.notes[index - 1]?.clientKey ??
+    null;
+  let deleted = false;
+
+  setBusy("delete", clientKey);
+  setStatus("Deleting note...", "loading");
+
+  try {
+    const { status } = await request(`${API_URL}/${note.id}`, {
+      method: "DELETE",
+    });
+
+    // JSONPlaceholder simulates deletion and can reuse IDs for created notes.
+    // Send the API id, then remove only this clientKey after HTTP success.
+    // If the API rejects the request, retain the note and report the error.
+    state.notes = state.notes.filter((item) => item.clientKey !== clientKey);
+    deleted = true;
+    renderNotes("No notes remain. Load notes or create a new note.");
+    setStatus(`Note deleted (status ${status}, id ${note.id}).`, "success");
+  } catch (error) {
+    setStatus(`Error: Could not delete note. ${error.message}`, "error");
+  } finally {
+    setBusy(null);
+
+    // Restore keyboard focus after the selected button is removed or restored.
+    const focusKey = deleted ? nextFocusKey : clientKey;
+    const focusTarget =
+      notesList.querySelector(`button[data-client-key="${focusKey}"]`) ||
+      loadButton;
+    focusTarget.focus();
   }
 }
 
